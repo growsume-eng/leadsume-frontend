@@ -19,6 +19,26 @@ export function parseSpintax(text: string): string {
 }
 
 /**
+ * Replace {{variable}} tokens with lead field values.
+ * If the field is missing or empty, replaces with an empty string (no crash).
+ */
+export function replaceVariables(text: string, lead: Record<string, string | undefined>): string {
+  return text.replace(/\{\{(\w+)\}\}/g, (_match, key: string) => {
+    // Support camelCase keys from the Lead interface
+    const camelKey = key.replace(/_([a-z])/g, (_, c) => c.toUpperCase());
+    return (lead[key] ?? lead[camelKey] ?? "").toString();
+  });
+}
+
+/**
+ * Apply both spintax randomisation and variable replacement in sequence.
+ */
+export function renderEmail(text: string, lead: Record<string, string | undefined>): string {
+  return replaceVariables(parseSpintax(text), lead);
+}
+
+
+/**
  * Generate a simple random ID.
  */
 export function generateId(): string {

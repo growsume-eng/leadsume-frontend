@@ -12,15 +12,23 @@ export interface ABVariant {
 }
 
 // ── Sequence ────────────────────────────────────────────────────────────────
-export type DelayUnit = "minutes" | "hours" | "days";
+export type DelayUnit = "hours" | "days";
+
+export interface SequenceVariants {
+  A: { subject: string; body: string };
+  B: { subject: string; body: string };
+  split: number; // 0-100, % of sends going to variant B
+}
 
 export interface Sequence {
   id: string;
   subject: string;
   body: string;
-  delayDays: number;
-  delayUnit: DelayUnit;
-  abVariant?: ABVariant; // optional A/B test variant
+  delayValue?: number;  // preferred — falls back to delayDays
+  delayUnit: DelayUnit; // "hours" | "days"
+  /** @deprecated use delayValue — kept for backward compat */
+  delayDays?: number;
+  variants?: SequenceVariants; // A/B test (UI only)
 }
 
 // ── Campaign Analytics ────────────────────────────────────────────────────────
