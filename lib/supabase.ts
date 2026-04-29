@@ -147,3 +147,72 @@ export function campaignToDb(c: Omit<Campaign, "id" | "createdAt" | "sequences" 
     start_date:               c.startDate || null,
   };
 }
+
+// ─── Inboxes ─────────────────────────────────────────────────────────────────
+// Supabase "inboxes" table columns:
+//   id              uuid (primary key, default gen_random_uuid())
+//   email           text
+//   domain          text  (nullable)
+//   smtp_host       text
+//   smtp_port       integer
+//   password        text  (nullable)
+//   daily_cap       integer
+//   warmup_enabled  boolean (nullable)
+//   status          text  (nullable)   Connected | Error | Connecting
+//   last_sync_at    timestamptz (nullable)
+//   created_at      timestamptz (default now())
+
+export interface SupabaseInbox {
+  id:             string;
+  email:          string | null;
+  domain:         string | null;
+  smtp_host:      string | null;
+  smtp_port:      number | null;
+  password:       string | null;
+  daily_cap:      number | null;
+  warmup_enabled: boolean | null;
+  status:         string | null;
+  last_sync_at:   string | null;
+  created_at:     string | null;
+}
+
+import type { InboxAccount } from "@/lib/types";
+
+/** Converts a raw Supabase inbox row → InboxAccount used by the UI. All nulls coerced safely. */
+export function dbInboxToLocal(row: SupabaseInbox): InboxAccount {
+  return {
+    id:         row.id,
+    email:      row.email     || "",
+    smtpHost:   row.smtp_host || "",
+    smtpPort:   row.smtp_port ?? 587,
+    password:   row.password  || "",
+    dailyCap:   row.daily_cap ?? 200,
+    status:     (row.status as InboxAccount["status"]) || "Connecting",
+    lastSyncAt: row.last_sync_at || new Date().toISOString(),
+    createdAt:  row.created_at   || new Date().toISOString(),
+  };
+}
+
+/** Builds the Supabase-safe insert/update payload for an inbox. */
+export function inboxToDb(data: {
+  email: string;
+  smtpHost: string;
+  smtpPort: number;
+  password?: string;
+  dailyCap: number;
+  domain?: string;
+  warmupEnabled?: boolean;
+}) {
+  const base: Record<string, unknown> = {
+    email:          data.email,
+    domain:         data.domain ?? data.email.split("@")[1] ?? null,
+    smtp_host:      data.smtpHost,
+    smtp_port:      data.smtpPort,
+    daily_cap:      data.dailyCap,
+    warmup_enabled: data.warmupEnabled ?? false,
+    last_sync_at:   new Date().toISOString(),
+  };
+  if (data.password) base.password = data.password;
+  return base;
+}
+
