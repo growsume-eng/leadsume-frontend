@@ -80,15 +80,9 @@ export default function CRMPage() {
                                   <GripVertical className="w-3.5 h-3.5" />
                                 </div>
                                 <div className="flex-1 mx-2 min-w-0">
-                                  <p className="text-sm font-semibold text-slate-200 truncate">{lead.name}</p>
+                                  <p className="text-sm font-semibold text-slate-200 truncate">{[lead.firstName, lead.lastName].filter(Boolean).join(" ") || "—"}</p>
                                   <p className="text-xs text-slate-500 truncate">{lead.company}</p>
-                                  {lead.tags.length > 0 && (
-                                    <div className="flex flex-wrap gap-1 mt-2">
-                                      {lead.tags.slice(0, 2).map(tag => (
-                                        <span key={tag} className="text-xs px-1.5 py-0.5 bg-indigo-600/15 text-indigo-400 rounded-md">{tag}</span>
-                                      ))}
-                                    </div>
-                                  )}
+
                                 </div>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
                                   <button onClick={() => setEditLead(lead)} className="p-1 rounded text-slate-600 hover:text-slate-300 transition-colors"><Pencil className="w-3 h-3" /></button>

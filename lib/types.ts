@@ -64,13 +64,12 @@ export interface Campaign {
 // ── Lead ────────────────────────────────────────────────────────────────────
 export interface Lead {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
-  company: string;
-  title: string;
+  company?: string;
+  website?: string;
   status: LeadStatus;
-  tags: string[];
-  owner: string;
   createdAt: string;
 }
 

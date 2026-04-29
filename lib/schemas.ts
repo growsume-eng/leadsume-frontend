@@ -23,13 +23,12 @@ export const campaignScheduleSchema = z.object({
 
 // ── Lead schema ──────────────────────────────────────────────────────────────
 export const leadSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  email: z.string().email("Invalid email address"),
-  company: z.string().min(1, "Company is required"),
-  title: z.string(),
-  status: z.enum(["New", "Contacted", "Qualified", "Proposal", "Won", "Lost"]),
-  tags: z.string(),
-  owner: z.string(),
+  firstName: z.string().min(1, "First name is required"),
+  lastName:  z.string().min(1, "Last name is required"),
+  email:     z.string().email("Invalid email address"),
+  company:   z.string().optional(),
+  website:   z.string().optional(),
+  status:    z.enum(["New", "Contacted", "Qualified", "Proposal", "Won", "Lost"]),
 });
 
 // ── Inbox schema ─────────────────────────────────────────────────────────────

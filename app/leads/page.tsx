@@ -9,19 +9,27 @@ import ConfirmModal from "@/components/shared/ConfirmModal";
 import EmptyState from "@/components/shared/EmptyState";
 import Spinner from "@/components/shared/Spinner";
 import { toast } from "sonner";
-import { Plus, Search, Pencil, Trash2, Upload, Users } from "lucide-react";
+import { Plus, Search, Pencil, Trash2, Upload, Users, Globe } from "lucide-react";
 import { format } from "date-fns";
 
 const STATUS_STYLES: Record<string, string> = {
-  New: "text-slate-400 bg-slate-400/10",
-  Contacted: "text-indigo-400 bg-indigo-400/10",
-  Qualified: "text-amber-400 bg-amber-400/10",
-  Proposal: "text-violet-400 bg-violet-400/10",
-  Won: "text-emerald-400 bg-emerald-400/10",
-  Lost: "text-rose-400 bg-rose-400/10",
+  New:        "text-slate-400 bg-slate-400/10",
+  Contacted:  "text-indigo-400 bg-indigo-400/10",
+  Qualified:  "text-amber-400 bg-amber-400/10",
+  Proposal:   "text-violet-400 bg-violet-400/10",
+  Won:        "text-emerald-400 bg-emerald-400/10",
+  Lost:       "text-rose-400 bg-rose-400/10",
 };
 
 const ALL_STATUSES: LeadStatus[] = ["New", "Contacted", "Qualified", "Proposal", "Won", "Lost"];
+
+/** Returns the full display name and the two-character avatar initials */
+function leadName(lead: Lead): string {
+  return [lead.firstName, lead.lastName].filter(Boolean).join(" ") || "—";
+}
+function leadInitials(lead: Lead): string {
+  return ((lead.firstName?.[0] ?? "") + (lead.lastName?.[0] ?? "")).toUpperCase() || "?";
+}
 
 export default function LeadsPage() {
   const { profile } = useAppState();
@@ -54,18 +62,17 @@ export default function LeadsPage() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    fetchLeads();
-  }, [fetchLeads]);
+  useEffect(() => { fetchLeads(); }, [fetchLeads]);
 
   // ── Filter ────────────────────────────────────────────────────────────────
   const filtered = useMemo(() =>
     leads.filter(l => {
+      const name = leadName(l).toLowerCase();
       const matchQ =
         query === "" ||
-        l.name.toLowerCase().includes(query.toLowerCase()) ||
-        l.email.toLowerCase().includes(query.toLowerCase()) ||
-        l.company.toLowerCase().includes(query.toLowerCase());
+        name.includes(query.toLowerCase()) ||
+        (l.email   || "").toLowerCase().includes(query.toLowerCase()) ||
+        (l.company || "").toLowerCase().includes(query.toLowerCase());
       const matchS = statusFilter === "All" || l.status === statusFilter;
       return matchQ && matchS;
     }),
@@ -87,12 +94,14 @@ export default function LeadsPage() {
   }
 
   // ── CSV Import ────────────────────────────────────────────────────────────
+  // Expected CSV columns: first_name, last_name, email, company, website
   async function handleImportCsv() {
     const lines = csvText.trim().split("\n").slice(1);
     const rows = lines
       .map(line => {
-        const [name, email, company = "", title = ""] = line.split(",").map(s => s.trim());
-        return { name: name || "Unknown", email: email || "", company, title, status: "New", tags: "", owner: profile.name };
+        const [first_name = "", last_name = "", email = "", company = "", website = ""] =
+          line.split(",").map(s => s.trim());
+        return { first_name, last_name, email, company: company || null, website: website || null, status: "New" };
       })
       .filter(r => r.email);
 
@@ -183,43 +192,62 @@ export default function LeadsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[#1f2d45] text-left">
-                {["Name", "Email", "Company", "Status", "Tags", "Owner", "Created", ""].map(h => (
-                  <th key={h} className="px-4 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">{h}</th>
+                {["Name", "Email", "Company", "Website", "Status", "Created", ""].map(h => (
+                  <th key={h} className="px-4 py-3.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    {h}
+                  </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1f2d45]">
               {filtered.map(lead => (
                 <tr key={lead.id} className="hover:bg-white/2 transition-colors group">
+                  {/* Name */}
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-2.5">
                       <div className="w-7 h-7 rounded-full bg-indigo-600/20 flex items-center justify-center text-xs font-bold text-indigo-400 shrink-0">
-                        {lead.name.split(" ").map(n => n[0]).join("").slice(0, 2)}
+                        {leadInitials(lead)}
                       </div>
-                      <div>
-                        <p className="font-medium text-slate-200">{lead.name}</p>
-                        <p className="text-xs text-slate-500">{lead.title}</p>
-                      </div>
+                      <p className="font-medium text-slate-200">{leadName(lead)}</p>
                     </div>
                   </td>
+
+                  {/* Email */}
                   <td className="px-4 py-3.5 text-slate-400 text-xs">{lead.email}</td>
-                  <td className="px-4 py-3.5 text-slate-300">{lead.company}</td>
+
+                  {/* Company */}
+                  <td className="px-4 py-3.5 text-slate-300">{lead.company || "—"}</td>
+
+                  {/* Website */}
+                  <td className="px-4 py-3.5">
+                    {lead.website ? (
+                      <a
+                        href={lead.website.startsWith("http") ? lead.website : `https://${lead.website}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-1 text-xs text-indigo-400 hover:text-indigo-300 transition-colors"
+                      >
+                        <Globe className="w-3 h-3" />
+                        {lead.website.replace(/^https?:\/\//, "")}
+                      </a>
+                    ) : (
+                      <span className="text-slate-600 text-xs">—</span>
+                    )}
+                  </td>
+
+                  {/* Status */}
                   <td className="px-4 py-3.5">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[lead.status]}`}>
                       {lead.status}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5">
-                    <div className="flex flex-wrap gap-1">
-                      {lead.tags.slice(0, 2).map(tag => (
-                        <span key={tag} className="text-xs px-1.5 py-0.5 bg-slate-700/50 text-slate-400 rounded">{tag}</span>
-                      ))}
-                    </div>
-                  </td>
-                  <td className="px-4 py-3.5 text-slate-500 text-xs">{lead.owner}</td>
+
+                  {/* Created */}
                   <td className="px-4 py-3.5 text-slate-600 text-xs">
                     {format(new Date(lead.createdAt), "MMM d")}
                   </td>
+
+                  {/* Actions */}
                   <td className="px-4 py-3.5">
                     <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                       <button
@@ -252,20 +280,18 @@ export default function LeadsPage() {
           <div className="bg-[#111827] border border-[#1f2d45] rounded-2xl p-6 w-full max-w-lg mx-4 animate-in fade-in zoom-in-95 duration-200">
             <h3 className="text-base font-semibold text-slate-100 mb-4">Import Leads via CSV</h3>
             <p className="text-xs text-slate-400 mb-3">
-              First row must be headers: <code className="bg-white/10 px-1 rounded">name,email,company,title</code>
+              First row must be headers:{" "}
+              <code className="bg-white/10 px-1 rounded">first_name,last_name,email,company,website</code>
             </p>
             <textarea
               value={csvText}
               onChange={e => setCsvText(e.target.value)}
               rows={8}
-              placeholder={"name,email,company,title\nJohn Doe,john@example.com,Acme,CEO"}
+              placeholder={"first_name,last_name,email,company,website\nJohn,Doe,john@example.com,Acme,https://acme.com"}
               className="w-full px-3 py-2 bg-[#0b0f1a] border border-[#1f2d45] rounded-lg text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono resize-none mb-4"
             />
             <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setShowCsv(false)}
-                className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
-              >
+              <button onClick={() => setShowCsv(false)} className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors">
                 Cancel
               </button>
               <button
@@ -280,19 +306,8 @@ export default function LeadsPage() {
         </div>
       )}
 
-      {showCreate && (
-        <LeadFormModal
-          onClose={() => setShowCreate(false)}
-          onSaved={fetchLeads}
-        />
-      )}
-      {editLead && (
-        <LeadFormModal
-          lead={editLead}
-          onClose={() => setEditLead(null)}
-          onSaved={fetchLeads}
-        />
-      )}
+      {showCreate && <LeadFormModal onClose={() => setShowCreate(false)} onSaved={fetchLeads} />}
+      {editLead  && <LeadFormModal lead={editLead} onClose={() => setEditLead(null)} onSaved={fetchLeads} />}
       <ConfirmModal
         open={!!deleteId}
         title="Delete Lead"

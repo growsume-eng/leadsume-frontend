@@ -48,8 +48,8 @@ export default function CampaignCreatePage() {
   function handleImportCsv() {
     const lines = csvText.trim().split("\n").slice(1);
     const newLeads = lines.map(line => {
-      const [name, email, company = ""] = line.split(",").map(s => s.trim());
-      return { name: name || "Unknown", email: email || "", company, title: "", status: "New" as const, tags: [], owner: state.profile.name };
+      const [firstName = "", lastName = "", email = "", company = ""] = line.split(",").map(s => s.trim());
+      return { firstName: firstName || "Unknown", lastName, email, company, status: "New" as const };
     }).filter(l => l.email);
     dispatch({ type: "ADD_LEADS_BULK", payload: newLeads });
     toast.success(`${newLeads.length} leads imported`);
@@ -240,7 +240,7 @@ export default function CampaignCreatePage() {
                         onChange={e => setSelectedLeadIds(e.target.checked ? [...selectedLeadIds, lead.id] : selectedLeadIds.filter(id => id !== lead.id))}
                         className="w-4 h-4 rounded accent-indigo-500" />
                       <div>
-                        <p className="text-sm font-medium text-slate-200">{lead.name}</p>
+                        <p className="text-sm font-medium text-slate-200">{[lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email}</p>
                         <p className="text-xs text-slate-500">{lead.email} · {lead.company}</p>
                       </div>
                     </label>
