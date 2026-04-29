@@ -19,13 +19,19 @@ const SPINTAX_EXAMPLES = [
   { pattern: "{Thanks|Appreciate it|Many thanks}", desc: "Sign-off variation" },
 ];
 
-const VARIABLES: Array<{ token: string; label: string; field: keyof Lead }> = [
-  { token: "{{first_name}}",  label: "First Name",  field: "firstName"  },
-  { token: "{{last_name}}",   label: "Last Name",   field: "lastName"   },
-  { token: "{{company}}",     label: "Company",     field: "company"    },
-  { token: "{{website}}",     label: "Website",     field: "website"    },
-  { token: "{{linkedin}}",    label: "LinkedIn",    field: "linkedin"   },
-  { token: "{{email}}",       label: "Email",       field: "email"      },
+const VARIABLES: Array<{ token: string; label: string }> = [
+  { token: "{{first_name}}",          label: "First Name"       },
+  { token: "{{last_name}}",           label: "Last Name"        },
+  { token: "{{company}}",             label: "Company"          },
+  { token: "{{website}}",             label: "Website"          },
+  { token: "{{linkedin}}",            label: "LinkedIn"         },
+  { token: "{{email}}",               label: "Email"            },
+];
+
+const SENDER_VARIABLES: Array<{ token: string; label: string }> = [
+  { token: "{{sender_first_name}}",   label: "Sender First Name"  },
+  { token: "{{sender_last_name}}",    label: "Sender Last Name"   },
+  { token: "{{sender_position}}",     label: "Sender Position"    },
 ];
 
 // ─── Shared input styles ──────────────────────────────────────────────────────
@@ -110,7 +116,7 @@ function HelpPanel({ onInsert }: { onInsert: (text: string) => void }) {
             </div>
           </div>
 
-          {/* Variables */}
+          {/* Lead Variables */}
           <div>
             <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
               Variables
@@ -126,6 +132,30 @@ function HelpPanel({ onInsert }: { onInsert: (text: string) => void }) {
                 >
                   <div className="min-w-0">
                     <code className="text-[10px] text-indigo-400 block truncate">{v.token}</code>
+                    <span className="text-[9px] text-slate-700">{v.label}</span>
+                  </div>
+                  <CopyButton text={v.token} />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Sender Variables */}
+          <div>
+            <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider mb-2">
+              Sender
+            </p>
+            <p className="text-[10px] text-slate-600 mb-2 leading-relaxed">
+              From inbox identity. Click to copy.
+            </p>
+            <div className="space-y-1">
+              {SENDER_VARIABLES.map(v => (
+                <div
+                  key={v.token}
+                  className="flex items-center justify-between bg-[#111827] border border-[#1f2d45] rounded-lg px-2 py-1.5"
+                >
+                  <div className="min-w-0">
+                    <code className="text-[10px] text-violet-400 block truncate">{v.token}</code>
                     <span className="text-[9px] text-slate-700">{v.label}</span>
                   </div>
                   <CopyButton text={v.token} />

@@ -64,9 +64,8 @@ export interface RampSettings {
 export interface Campaign {
   id: string;
   name: string;
-  sendingEmail: string;       // primary inbox email (kept for backward compat)
-  inboxIds: string[];         // multi-inbox: array of InboxAccount IDs
-  fromName: string;
+  sendingEmail: string;          // primary inbox email (kept for backward compat)
+  inboxIds: string[];            // multi-inbox: array of InboxAccount IDs
   domain: string;
   status: CampaignStatus;
   sequences: Sequence[];
@@ -95,6 +94,9 @@ export interface Lead {
   instagram?: string;
   facebook?:  string;
 
+  city?:         string;
+  state?:        string;
+
   status?:       string;
   tags?:         string[];
   customFields?: Record<string, string>; // {{token}} variables from CSV import
@@ -110,8 +112,12 @@ export interface InboxAccount {
   smtpPort: number;
   password: string;
   status: InboxStatus;
-  lastSyncAt: string;  // ISO timestamp
-  dailyCap: number;    // daily sending limit
+  lastSyncAt: string;   // ISO timestamp
+  dailyCap: number;     // daily sending limit
+  // Sender identity — used as {{sender_first_name}}, {{sender_last_name}}, {{sender_position}}
+  firstName?: string;
+  lastName?:  string;
+  position?:  string;
   createdAt: string;
 }
 

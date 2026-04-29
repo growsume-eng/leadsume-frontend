@@ -11,8 +11,7 @@ export const sequenceSchema = z.object({
 // ── Campaign schemas ─────────────────────────────────────────────────────────
 export const campaignDetailsSchema = z.object({
   name:         z.string().min(1, "Campaign name is required"),
-  sendingEmail: z.string(), // set via setValue from inbox selection; defaultValues=""
-  fromName:     z.string().min(1, "From name is required"),
+  sendingEmail: z.string(),
   domain:       z.string().min(1, "Domain is required"),
 });
 
@@ -36,11 +35,14 @@ export const leadSchema = z.object({
 
 // ── Inbox schema ─────────────────────────────────────────────────────────────
 export const inboxSchema = z.object({
-  email: z.string().email("Invalid email address"),
-  smtpHost: z.string().min(1, "SMTP host is required"),
-  smtpPort: z.number().min(1).max(65535),
-  password: z.string().min(1, "Password is required"),
-  dailyCap: z.number().min(1, "Daily cap must be at least 1").max(10000),
+  email:     z.string().email("Invalid email address"),
+  smtpHost:  z.string().min(1, "SMTP host is required"),
+  smtpPort:  z.number().min(1).max(65535),
+  password:  z.string().min(1, "Password is required"),
+  dailyCap:  z.number().min(1).max(10000),
+  firstName: z.string().optional(),
+  lastName:  z.string().optional(),
+  position:  z.string().optional(),
 });
 
 // ── Profile schema ───────────────────────────────────────────────────────────

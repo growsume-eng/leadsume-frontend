@@ -42,38 +42,38 @@ function InboxFormModal({ inbox, onClose, onSaved }: InboxFormModalProps) {
   const { register, handleSubmit, formState: { errors } } = useForm<InboxFormValues>({
     resolver: zodResolver(inboxSchema),
     defaultValues: {
-      email:    inbox?.email    ?? "",
-      smtpHost: inbox?.smtpHost ?? "smtp.gmail.com",
-      smtpPort: inbox?.smtpPort ?? 587,
-      password: "",
-      dailyCap: inbox?.dailyCap ?? 200,
+      email:     inbox?.email    ?? "",
+      smtpHost:  inbox?.smtpHost ?? "smtp.gmail.com",
+      smtpPort:  inbox?.smtpPort ?? 587,
+      password:  "",
+      dailyCap:  inbox?.dailyCap ?? 200,
+      firstName: inbox?.firstName ?? "",
+      lastName:  inbox?.lastName  ?? "",
+      position:  inbox?.position  ?? "",
     },
   });
 
   async function onSubmit(data: InboxFormValues) {
     setSaving(true);
     try {
+      const identityData = { ...data, firstName: data.firstName, lastName: data.lastName, position: data.position };
       if (isEdit && inbox) {
         // UPDATE
-        const payload = inboxToDb(data);
         const { error } = await supabase
           .from("inboxes")
-          .update(payload)
+          .update(inboxToDb(identityData))
           .eq("id", inbox.id);
         if (error) throw error;
         toast.success("Inbox updated");
       } else {
         // INSERT
-        const payload = { ...inboxToDb(data), status: "Connecting" };
         const { data: inserted, error } = await supabase
           .from("inboxes")
-          .insert(payload)
+          .insert({ ...inboxToDb(identityData), status: "Connecting" })
           .select()
           .single();
         if (error) throw error;
         toast.success("Inbox added — connecting…");
-
-        // Simulate async connection: update status to Connected after 2.5s
         if (inserted?.id) {
           setTimeout(async () => {
             await supabase
@@ -109,9 +109,12 @@ function InboxFormModal({ inbox, onClose, onSaved }: InboxFormModalProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           {/* Text fields */}
           {([
-            { name: "email"    as const, label: "Email Address",           placeholder: "you@domain.com",  type: "email"    },
-            { name: "smtpHost" as const, label: "SMTP Host",               placeholder: "smtp.gmail.com",  type: "text"     },
+            { name: "email"     as const, label: "Email Address",           placeholder: "you@domain.com",  type: "email"    },
+            { name: "smtpHost" as const,  label: "SMTP Host",               placeholder: "smtp.gmail.com",  type: "text"     },
             { name: "password" as const, label: "Password / App Password", placeholder: "••••••••",        type: "password" },
+            { name: "firstName" as const, label: "Sender First Name",       placeholder: "Alex",            type: "text"     },
+            { name: "lastName"  as const, label: "Sender Last Name",        placeholder: "Rivera",          type: "text"     },
+            { name: "position"  as const, label: "Sender Position",         placeholder: "e.g. Head of Growth", type: "text" },
           ] as const).map(({ name, label, placeholder, type }) => (
             <div key={name}>
               <label className="block text-xs font-medium text-slate-400 mb-1.5">{label}</label>

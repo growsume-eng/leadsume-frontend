@@ -17,7 +17,6 @@ export default function CampaignEditPage() {
 
   const [name, setName] = useState(campaign?.name ?? "");
   const [sendingEmail, setSendingEmail] = useState(campaign?.sendingEmail ?? "");
-  const [fromName, setFromName] = useState(campaign?.fromName ?? "");
   const [domain, setDomain] = useState(campaign?.domain ?? "");
   const [sequences, setSequences] = useState<Sequence[]>(campaign?.sequences ?? []);
   const [previewText, setPreviewText] = useState<string | null>(null);
@@ -35,7 +34,7 @@ export default function CampaignEditPage() {
 
   function handleSave() {
     if (!name.trim()) { toast.error("Campaign name is required"); return; }
-    const updated: Campaign = { ...(campaign as Campaign), name, sendingEmail, fromName, domain, sequences };
+    const updated: Campaign = { ...(campaign as Campaign), name, sendingEmail, domain, sequences };
     dispatch({ type: "UPDATE_CAMPAIGN", payload: updated });
     toast.success("Campaign updated");
     router.push("/campaigns");
@@ -57,7 +56,6 @@ export default function CampaignEditPage() {
         <h3 className="text-sm font-semibold text-slate-200">Details</h3>
         {[
           { label: "Campaign Name", value: name, set: setName },
-          { label: "From Name", value: fromName, set: setFromName },
           { label: "Domain", value: domain, set: setDomain },
         ].map(({ label, value, set }) => (
           <div key={label}>

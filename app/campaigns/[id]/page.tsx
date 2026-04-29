@@ -249,8 +249,8 @@ export default function CampaignDetailPage() {
             <p className="text-slate-200">{campaign.rampSettings.enabled ? `${campaign.rampSettings.start}→${campaign.rampSettings.max}` : "Disabled"}</p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 mb-1">From Name</p>
-            <p className="text-slate-200">{campaign.fromName}</p>
+            <p className="text-xs text-slate-500 mb-1">Inboxes</p>
+            <p className="text-slate-200">{campaign.inboxIds?.length ?? 1} selected</p>
           </div>
         </div>
       </div>

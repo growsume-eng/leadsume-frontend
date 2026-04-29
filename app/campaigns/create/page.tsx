@@ -26,7 +26,7 @@ export default function CampaignCreatePage() {
 
   // Step 1: details
   const [details, setDetails] = useState<CampaignDetailsValues | null>(null);
-  const detailsForm = useForm<CampaignDetailsValues>({ resolver: zodResolver(campaignDetailsSchema), defaultValues: { name: "", sendingEmail: "", fromName: "", domain: "" } });
+  const detailsForm = useForm<CampaignDetailsValues>({ resolver: zodResolver(campaignDetailsSchema), defaultValues: { name: "", sendingEmail: "", domain: "" } });
 
   // Step 2: sequences
   const [sequences, setSequences] = useState<Sequence[]>([{
@@ -94,7 +94,6 @@ export default function CampaignCreatePage() {
       }
       // derive sendingEmail from first selected inbox
       const primaryInbox = state.inboxes.find(i => i.id === selectedInboxIds[0]);
-      detailsForm.setValue("sendingEmail", primaryInbox?.email ?? "");
       setDetails({ ...detailsForm.getValues(), sendingEmail: primaryInbox?.email ?? "" });
       setStep(1);
     } else if (step === 1) {
@@ -130,7 +129,6 @@ export default function CampaignCreatePage() {
         name: details.name,
         sendingEmail: details.sendingEmail,
         inboxIds: selectedInboxIds,
-        fromName: details.fromName,
         domain: details.domain,
         status: "Running",
         sequences,
@@ -162,7 +160,6 @@ export default function CampaignCreatePage() {
         name: details.name,
         sendingEmail: details.sendingEmail || "",
         inboxIds: selectedInboxIds,
-        fromName: details.fromName || "",
         domain: details.domain || "",
         status: "Draft",
         sequences,
@@ -213,7 +210,6 @@ export default function CampaignCreatePage() {
             <h3 className="text-base font-semibold text-slate-200">Campaign Details</h3>
             {[
               { name: "name" as const, label: "Campaign Name", placeholder: "e.g. SaaS Founders Q2" },
-              { name: "fromName" as const, label: "From Name", placeholder: "e.g. Alex Rivera" },
               { name: "domain" as const, label: "Sending Domain", placeholder: "e.g. growsume.io" },
             ].map(({ name, label, placeholder }) => (
               <div key={name}>
@@ -368,7 +364,6 @@ export default function CampaignCreatePage() {
             <div className="grid grid-cols-2 gap-4">
               {[
                 { label: "Campaign Name",   value: details.name },
-                { label: "From Name",        value: details.fromName },
                 { label: "Domain",           value: details.domain },
                 { label: "Inboxes",          value: `${selectedInboxIds.length} selected` },
                 { label: "Daily Capacity",   value: `~${scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length} emails/day` },

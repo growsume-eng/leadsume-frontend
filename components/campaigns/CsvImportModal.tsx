@@ -19,6 +19,8 @@ const STANDARD_FIELDS = [
   { value: "linkedin",    label: "LinkedIn"    },
   { value: "instagram",   label: "Instagram"   },
   { value: "facebook",    label: "Facebook"    },
+  { value: "city",        label: "City"        },
+  { value: "state",       label: "State"       },
   { value: "tags",        label: "Tags (comma-separated)" },
   { value: "__skip",      label: "— Skip this column —"  },
   { value: "__custom",    label: "→ Custom field ({{token}})" },
@@ -32,12 +34,14 @@ function guessField(header: string): StandardField {
   if (h.includes("firstname") || h === "fname" || h === "first") return "first_name";
   if (h.includes("lastname")  || h === "lname" || h === "last")  return "last_name";
   if (h.includes("email"))    return "email";
-  if (h.includes("company") || h.includes("org"))    return "company";
-  if (h.includes("website") || h.includes("url"))    return "website";
+  if (h.includes("company") || h.includes("org"))     return "company";
+  if (h.includes("website") || h.includes("url"))     return "website";
   if (h.includes("linkedin")) return "linkedin";
-  if (h.includes("instagram") || h === "ig")         return "instagram";
-  if (h.includes("facebook")  || h === "fb")         return "facebook";
+  if (h.includes("instagram") || h === "ig")          return "instagram";
+  if (h.includes("facebook")  || h === "fb")          return "facebook";
   if (h.includes("tag"))      return "tags";
+  if (h.includes("city"))     return "city";
+  if (h.includes("state") || h.includes("province"))  return "state";
   return "__custom";
 }
 
@@ -113,23 +117,22 @@ function MappingRow({
 
 export default function CsvImportModal({ onClose, onImported }: CsvImportModalProps) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [rows,     setRows]     = useState<Record<string, string>[]>([]);
-  const [headers,  setHeaders]  = useState<string[]>([]);
-  const [mappings, setMappings] = useState<ColumnMapping[]>([]);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState<string | null>(null);
-  const [phase,    setPhase]    = useState<"upload" | "map" | "done">("upload");
+  const [rows,         setRows]         = useState<Record<string, string>[]>([]);
+  const [mappings,     setMappings]     = useState<ColumnMapping[]>([]);
+  const [saving,       setSaving]       = useState(false);
+  const [error,        setError]        = useState<string | null>(null);
+  const [phase,        setPhase]        = useState<"upload" | "map" | "done">("upload");
+  const [insertedCount, setInsertedCount] = useState(0);
 
   // ── Parse CSV ───────────────────────────────────────────────────────────────
   const handleFile = useCallback((file: File) => {
     setError(null);
     Papa.parse<Record<string, string>>(file, {
-      header:       true,
+      header:         true,
       skipEmptyLines: true,
       complete: (result) => {
         if (!result.data.length) { setError("CSV has no rows."); return; }
         const hdrs = result.meta.fields ?? [];
-        setHeaders(hdrs);
         setRows(result.data);
         setMappings(hdrs.map(h => ({
           csvHeader:   h,
@@ -158,36 +161,42 @@ export default function CsvImportModal({ onClose, onImported }: CsvImportModalPr
   }
 
   // ── Build lead objects ──────────────────────────────────────────────────────
-  function buildLeads(): Array<Omit<Lead, "id"> & { custom_fields?: Record<string, string> }> {
-    return rows.map(row => {
-      const std: Record<string, string> = {};
-      const custom: Record<string, string> = {};
+  function buildLeads() {
+    return rows
+      .map(row => {
+        const std:    Record<string, string> = {};
+        const custom: Record<string, string> = {};
 
-      for (const m of mappings) {
-        const val = (row[m.csvHeader] ?? "").trim();
-        if (m.mappedField === "__skip" || !val) continue;
-        if (m.mappedField === "__custom") {
-          if (m.customToken) custom[m.customToken] = val;
-        } else {
-          std[m.mappedField] = val;
+        for (const m of mappings) {
+          const val = (row[m.csvHeader] ?? "").trim();
+          if (m.mappedField === "__skip" || !val) continue;
+          if (m.mappedField === "__custom") {
+            if (m.customToken) custom[m.customToken] = val;
+          } else {
+            std[m.mappedField] = val;
+          }
         }
-      }
 
-      return {
-        firstName:    std["first_name"] || "",
-        lastName:     std["last_name"]  || "",
-        email:        std["email"]      || "",
-        company:      std["company"],
-        website:      std["website"],
-        linkedin:     std["linkedin"],
-        instagram:    std["instagram"],
-        facebook:     std["facebook"],
-        tags:         std["tags"] ? std["tags"].split(",").map(t => t.trim()).filter(Boolean) : [],
-        status:       "New",
-        customFields: Object.keys(custom).length ? custom : undefined,
-        custom_fields: Object.keys(custom).length ? custom : undefined,
-      };
-    }).filter(l => l.email);
+        // Build the Supabase row payload directly (snake_case)
+        const payload: Record<string, unknown> = {
+          first_name:    std["first_name"]  || null,
+          last_name:     std["last_name"]   || null,
+          email:         std["email"]       || null,
+          company:       std["company"]     || null,
+          website:       std["website"]     || null,
+          linkedin:      std["linkedin"]    || null,
+          instagram:     std["instagram"]   || null,
+          facebook:      std["facebook"]    || null,
+          city:          std["city"]        || null,
+          state:         std["state"]       || null,
+          tags:          std["tags"] ? std["tags"].split(",").map(t => t.trim()).filter(Boolean).join(",") : null,
+          status:        "New",
+          custom_fields: Object.keys(custom).length ? custom : null,
+        };
+
+        return { payload, email: std["email"] || null };
+      })
+      .filter(r => !!r.email); // require email
   }
 
   // ── Save to Supabase ────────────────────────────────────────────────────────
@@ -195,52 +204,63 @@ export default function CsvImportModal({ onClose, onImported }: CsvImportModalPr
     setSaving(true);
     setError(null);
     try {
-      const builtLeads = buildLeads();
-      if (!builtLeads.length) { setError("No valid leads found (email required)."); setSaving(false); return; }
+      const built = buildLeads();
 
-      const payload = builtLeads.map(l => ({
-        first_name:    l.firstName   || null,
-        last_name:     l.lastName    || null,
-        email:         l.email,
-        company:       l.company     || null,
-        website:       l.website     || null,
-        linkedin:      l.linkedin    || null,
-        instagram:     l.instagram   || null,
-        facebook:      l.facebook    || null,
-        tags:          l.tags?.join(",") || null,
-        status:        "New",
-        custom_fields: l.custom_fields ?? null,
-      }));
+      if (!built.length) {
+        setError("No valid leads found. Make sure 'Email' column is mapped and not empty.");
+        setSaving(false);
+        return;
+      }
 
-      const { data, error: dbErr } = await supabase
-        .from("leads")
-        .upsert(payload, { onConflict: "email" })
-        .select();
+      const payload = built.map(r => r.payload);
+      console.log("[CsvImport] inserting", payload.length, "leads:", payload);
 
-      if (dbErr) throw dbErr;
+      // Insert in batches of 100 to stay within Supabase row limits
+      const BATCH = 100;
+      let inserted: any[] = [];
 
-      // Convert returned rows to Lead[]
-      const inserted: Lead[] = (data ?? []).map((row: any) => ({
+      for (let i = 0; i < payload.length; i += BATCH) {
+        const batch = payload.slice(i, i + BATCH);
+        const { data, error: dbErr } = await supabase
+          .from("leads")
+          .insert(batch)
+          .select();
+
+        if (dbErr) {
+          console.error("[CsvImport] Supabase error:", dbErr.code, dbErr.message, dbErr.details);
+          throw new Error(`Supabase error (${dbErr.code}): ${dbErr.message}`);
+        }
+
+        console.log("[CsvImport] batch inserted:", data?.length, "rows");
+        inserted = [...inserted, ...(data ?? [])];
+      }
+
+      // Map returned rows to Lead[]
+      const importedLeads: Lead[] = inserted.map((row: any) => ({
         id:           row.id,
         firstName:    row.first_name  || "",
         lastName:     row.last_name   || "",
         email:        row.email       || "",
-        company:      row.company,
-        website:      row.website,
-        linkedin:     row.linkedin,
-        instagram:    row.instagram,
-        facebook:     row.facebook,
+        company:      row.company     ?? undefined,
+        website:      row.website     ?? undefined,
+        linkedin:     row.linkedin    ?? undefined,
+        instagram:    row.instagram   ?? undefined,
+        facebook:     row.facebook    ?? undefined,
+        city:         row.city        ?? undefined,
+        state:        row.state       ?? undefined,
         tags:         (row.tags || "").split(",").filter(Boolean),
         status:       row.status      || "New",
         customFields: row.custom_fields ?? undefined,
         createdAt:    row.created_at,
       }));
 
+      console.log("[CsvImport] done — inserted", importedLeads.length, "leads");
+      setInsertedCount(importedLeads.length);
       setPhase("done");
-      onImported(inserted);
+      onImported(importedLeads);
     } catch (err: any) {
-      console.error("[CsvImportModal] import error:", err);
-      setError(err?.message ?? "Import failed. Check console.");
+      console.error("[CsvImport] import failed:", err);
+      setError(err?.message ?? "Import failed. Open DevTools console for details.");
     } finally {
       setSaving(false);
     }
@@ -327,14 +347,15 @@ export default function CsvImportModal({ onClose, onImported }: CsvImportModalPr
             </div>
           )}
 
-          {/* ── Done phase ── */}
           {phase === "done" && (
             <div className="flex flex-col items-center gap-3 py-8">
               <div className="w-12 h-12 rounded-full bg-emerald-500/15 flex items-center justify-center">
                 <Check className="w-6 h-6 text-emerald-400" />
               </div>
-              <p className="text-sm font-semibold text-slate-200">Leads imported successfully</p>
-              <p className="text-xs text-slate-500">{rows.length} rows processed and saved to Supabase.</p>
+              <p className="text-sm font-semibold text-slate-200">
+                {insertedCount} lead{insertedCount !== 1 ? "s" : ""} imported successfully
+              </p>
+              <p className="text-xs text-slate-500">Saved to Supabase and added to your recipients list.</p>
             </div>
           )}
 

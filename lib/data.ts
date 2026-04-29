@@ -57,7 +57,6 @@ export const mockCampaigns: Campaign[] = [
     name: "SaaS Founders Outreach Q2",
     sendingEmail: "alex@growsume.io",
     inboxIds: ["i1", "i2"],
-    fromName: "Alex Rivera",
     domain: "growsume.io",
     status: "Running",
     sequences: [
@@ -79,7 +78,6 @@ export const mockCampaigns: Campaign[] = [
     name: "E-commerce Brand Outreach",
     sendingEmail: "sarah@growsume.io",
     inboxIds: ["i2"],
-    fromName: "Sarah Chen",
     domain: "growsume.io",
     status: "Scheduled",
     sequences: [
@@ -99,7 +97,6 @@ export const mockCampaigns: Campaign[] = [
     name: "Agency Partnership Drive",
     sendingEmail: "alex@growsume.io",
     inboxIds: ["i1"],
-    fromName: "Alex Rivera",
     domain: "growsume.io",
     status: "Paused",
     sequences: [
@@ -120,7 +117,6 @@ export const mockCampaigns: Campaign[] = [
     name: "Investor Cold Outreach",
     sendingEmail: "alex@growsume.io",
     inboxIds: ["i1"],
-    fromName: "Alex Rivera",
     domain: "growsume.io",
     status: "Completed",
     sequences: [
@@ -140,7 +136,6 @@ export const mockCampaigns: Campaign[] = [
     name: "Content Marketing Leads",
     sendingEmail: "sarah@growsume.io",
     inboxIds: ["i2"],
-    fromName: "Sarah Chen",
     domain: "growsume.io",
     status: "Draft",
     sequences: [],

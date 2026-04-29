@@ -40,6 +40,8 @@ export interface SupabaseLead {
   linkedin:      string | null;
   instagram:     string | null;
   facebook:      string | null;
+  city:          string | null;
+  state:         string | null;
   status:        string | null;
   tags:          string | null;
   custom_fields: Record<string, string> | null;  // JSONB
@@ -58,11 +60,13 @@ export function dbLeadToLocal(row: SupabaseLead): Lead {
     firstName:    row.first_name  || "",
     lastName:     row.last_name   || "",
     email:        row.email       || "",
-    company:      row.company     || "",
-    website:      row.website     || "",
-    linkedin:     row.linkedin    || "",
-    instagram:    row.instagram   || "",
-    facebook:     row.facebook    || "",
+    company:      row.company     || undefined,
+    website:      row.website     || undefined,
+    linkedin:     row.linkedin    || undefined,
+    instagram:    row.instagram   || undefined,
+    facebook:     row.facebook    || undefined,
+    city:         row.city        || undefined,
+    state:        row.state       || undefined,
     status:       row.status      || "New",
     tags:         (row.tags || "").split(",").map(t => t.trim()).filter(Boolean),
     customFields: row.custom_fields ?? undefined,
@@ -137,7 +141,6 @@ export function dbCampaignToLocal(row: SupabaseCampaign): Campaign {
     name:                 row.name                     || "",
     sendingEmail:         row.sending_email            || "",
     inboxIds:             Array.isArray(row.inbox_ids) ? row.inbox_ids : [],
-    fromName:             row.from_name                || "",
     domain:               row.domain                   || "",
     status:               (row.status as Campaign["status"]) || "Draft",
     emailsPerDay:         row.emails_per_day           ?? 50,
@@ -161,7 +164,6 @@ export function campaignToDb(c: Omit<Campaign, "id" | "createdAt">) {
     name:                     c.name,
     sending_email:            c.sendingEmail,
     inbox_ids:                c.inboxIds.length > 0 ? c.inboxIds : [],
-    from_name:                c.fromName,
     domain:                   c.domain,
     status:                   c.status,
     emails_per_day:           c.emailsPerDay,
@@ -200,6 +202,9 @@ export interface SupabaseInbox {
   warmup_enabled: boolean | null;
   status:         string | null;
   last_sync_at:   string | null;
+  first_name:     string | null;
+  last_name:      string | null;
+  position:       string | null;
   created_at:     string | null;
 }
 
@@ -216,6 +221,9 @@ export function dbInboxToLocal(row: SupabaseInbox): InboxAccount {
     dailyCap:   row.daily_cap ?? 200,
     status:     (row.status as InboxAccount["status"]) || "Connecting",
     lastSyncAt: row.last_sync_at || new Date().toISOString(),
+    firstName:  row.first_name   || undefined,
+    lastName:   row.last_name    || undefined,
+    position:   row.position     || undefined,
     createdAt:  row.created_at   || new Date().toISOString(),
   };
 }
@@ -229,6 +237,9 @@ export function inboxToDb(data: {
   dailyCap: number;
   domain?: string;
   warmupEnabled?: boolean;
+  firstName?: string;
+  lastName?: string;
+  position?: string;
 }) {
   const base: Record<string, unknown> = {
     email:          data.email,
@@ -238,6 +249,9 @@ export function inboxToDb(data: {
     daily_cap:      data.dailyCap,
     warmup_enabled: data.warmupEnabled ?? false,
     last_sync_at:   new Date().toISOString(),
+    first_name:     data.firstName ?? null,
+    last_name:      data.lastName  ?? null,
+    position:       data.position  ?? null,
   };
   if (data.password) base.password = data.password;
   return base;
