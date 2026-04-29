@@ -95,8 +95,9 @@ export interface Lead {
   instagram?: string;
   facebook?:  string;
 
-  status?:    string;
-  tags?:      string[];
+  status?:       string;
+  tags?:         string[];
+  customFields?: Record<string, string>; // {{token}} variables from CSV import
 
   createdAt?: string;
 }

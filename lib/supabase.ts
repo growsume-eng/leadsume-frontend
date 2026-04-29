@@ -31,18 +31,19 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
  * Raw shape returned by Supabase — every non-PK column can be null.
  */
 export interface SupabaseLead {
-  id:          string;
-  first_name:  string | null;
-  last_name:   string | null;
-  email:       string | null;
-  company:     string | null;
-  website:     string | null;
-  linkedin:    string | null;
-  instagram:   string | null;
-  facebook:    string | null;
-  status:      string | null;
-  tags:        string | null;
-  created_at:  string | null;
+  id:            string;
+  first_name:    string | null;
+  last_name:     string | null;
+  email:         string | null;
+  company:       string | null;
+  website:       string | null;
+  linkedin:      string | null;
+  instagram:     string | null;
+  facebook:      string | null;
+  status:        string | null;
+  tags:          string | null;
+  custom_fields: Record<string, string> | null;  // JSONB
+  created_at:    string | null;
 }
 
 import type { Lead } from "@/lib/types";
@@ -53,23 +54,19 @@ import type { Lead } from "@/lib/types";
  */
 export function dbLeadToLocal(row: SupabaseLead): Lead {
   return {
-    id:        row.id,
-
-    firstName: row.first_name  || "",
-    lastName:  row.last_name   || "",
-
-    email:     row.email       || "",
-    company:   row.company     || "",
-
-    website:   row.website     || "",
-    linkedin:  row.linkedin    || "",
-    instagram: row.instagram   || "",
-    facebook:  row.facebook    || "",
-
-    status:    row.status      || "New",
-    tags:      (row.tags || "").split(",").map(t => t.trim()).filter(Boolean),
-
-    createdAt: row.created_at  || new Date().toISOString(),
+    id:           row.id,
+    firstName:    row.first_name  || "",
+    lastName:     row.last_name   || "",
+    email:        row.email       || "",
+    company:      row.company     || "",
+    website:      row.website     || "",
+    linkedin:     row.linkedin    || "",
+    instagram:    row.instagram   || "",
+    facebook:     row.facebook    || "",
+    status:       row.status      || "New",
+    tags:         (row.tags || "").split(",").map(t => t.trim()).filter(Boolean),
+    customFields: row.custom_fields ?? undefined,
+    createdAt:    row.created_at  || new Date().toISOString(),
   };
 }
 

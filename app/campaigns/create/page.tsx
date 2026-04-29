@@ -6,12 +6,13 @@ import { useAppState, useAppDispatch } from "@/context/AppContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { campaignDetailsSchema, campaignScheduleSchema, type CampaignDetailsValues, type CampaignScheduleValues } from "@/lib/schemas";
-import type { Sequence, Campaign, InboxAccount } from "@/lib/types";
+import type { Sequence, Campaign, InboxAccount, Lead } from "@/lib/types";
 import { generateId, parseSpintax } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles, Inbox, Zap, AlertCircle, Loader2 } from "lucide-react";
 import SequenceEditor from "@/components/campaigns/SequenceEditor";
 import ScheduleTab, { type ScheduleConfig } from "@/components/campaigns/ScheduleTab";
+import RecipientsTab from "@/components/campaigns/RecipientsTab";
 import { supabase, campaignToDb } from "@/lib/supabase";
 
 const STEPS = ["Details", "Sequences", "Recipients", "Schedule", "Review"];
@@ -37,10 +38,12 @@ export default function CampaignCreatePage() {
   const [selectedInboxIds, setSelectedInboxIds] = useState<string[]>([]);
   const [emailsPerDayPerInbox, setEmailsPerDayPerInbox] = useState(30);
 
-  // Step 3: recipients
+  // Step 3: recipients — local copy of leads so imports merge in
+  const [localLeads,     setLocalLeads]     = useState<Lead[]>(state.leads);
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
-  const [csvText, setCsvText] = useState("");
-  const [showCsvImport, setShowCsvImport] = useState(false);
+
+  // Keep localLeads in sync if AppContext leads change
+  useMemo(() => { setLocalLeads(state.leads); }, [state.leads]);
 
   // Step 4: schedule — managed as local state, not a form
   const [schedule, setSchedule] = useState<CampaignScheduleValues | null>(null);
@@ -74,18 +77,6 @@ export default function CampaignCreatePage() {
     setSequences(sequences.map(s => s.id === id ? { ...s, [field]: value } : s));
   }
   function previewSpintax(body: string) { setPreviewText(parseSpintax(body)); }
-
-  function handleImportCsv() {
-    const lines = csvText.trim().split("\n").slice(1);
-    const newLeads = lines.map(line => {
-      const [firstName = "", lastName = "", email = "", company = ""] = line.split(",").map(s => s.trim());
-      return { firstName: firstName || "Unknown", lastName, email, company, status: "New" as const };
-    }).filter(l => l.email);
-    dispatch({ type: "ADD_LEADS_BULK", payload: newLeads });
-    toast.success(`${newLeads.length} leads imported`);
-    setCsvText("");
-    setShowCsvImport(false);
-  }
 
   function toggleInbox(id: string) {
     setSelectedInboxIds(prev =>
@@ -347,42 +338,18 @@ export default function CampaignCreatePage() {
 
         {/* Step 2: Recipients */}
         {step === 2 && (
-          <div className="space-y-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-base font-semibold text-slate-200">Select Recipients</h3>
-              <button onClick={() => setShowCsvImport(!showCsvImport)} className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors">
-                {showCsvImport ? "Back to selection" : "Import CSV"}
-              </button>
-            </div>
-            {!showCsvImport ? (
-              <>
-                <p className="text-sm text-slate-400">{selectedLeadIds.length} lead{selectedLeadIds.length !== 1 ? "s" : ""} selected</p>
-                <div className="max-h-80 overflow-y-auto space-y-1.5">
-                  {state.leads.map(lead => (
-                    <label key={lead.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-white/3 cursor-pointer transition-colors">
-                      <input type="checkbox" checked={selectedLeadIds.includes(lead.id)}
-                        onChange={e => setSelectedLeadIds(e.target.checked ? [...selectedLeadIds, lead.id] : selectedLeadIds.filter(id => id !== lead.id))}
-                        className="w-4 h-4 rounded accent-indigo-500" />
-                      <div>
-                        <p className="text-sm font-medium text-slate-200">{[lead.firstName, lead.lastName].filter(Boolean).join(" ") || lead.email}</p>
-                        <p className="text-xs text-slate-500">{lead.email} · {lead.company}</p>
-                      </div>
-                    </label>
-                  ))}
-                </div>
-              </>
-            ) : (
-              <div className="space-y-3">
-                <p className="text-xs text-slate-400">Paste CSV content below (first row = header: name,email,company)</p>
-                <textarea value={csvText} onChange={e => setCsvText(e.target.value)} rows={8} placeholder="name,email,company&#10;John Doe,john@example.com,Acme Corp"
-                  className="w-full px-3 py-2 bg-[#0b0f1a] border border-[#1f2d45] rounded-lg text-sm text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono resize-none" />
-                <button onClick={handleImportCsv} disabled={!csvText.trim()}
-                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors">
-                  Import Leads
-                </button>
-              </div>
-            )}
-          </div>
+          <RecipientsTab
+            leads={localLeads}
+            selectedLeadIds={selectedLeadIds}
+            onSelectionChange={setSelectedLeadIds}
+            onLeadsImported={newLeads => {
+              setLocalLeads(prev => {
+                const existing = new Set(prev.map(l => l.id));
+                const merged = [...prev, ...newLeads.filter(l => !existing.has(l.id))];
+                return merged;
+              });
+            }}
+          />
         )}
 
         {/* Step 3: Schedule */}
