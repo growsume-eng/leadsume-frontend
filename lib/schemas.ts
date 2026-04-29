@@ -28,6 +28,9 @@ export const leadSchema = z.object({
   email:     z.string().email("Invalid email address"),
   company:   z.string().optional(),
   website:   z.string().optional(),
+  linkedin:  z.string().optional(),
+  instagram: z.string().optional(),
+  facebook:  z.string().optional(),
   status:    z.enum(["New", "Contacted", "Qualified", "Proposal", "Won", "Lost"]),
 });
 

@@ -4,6 +4,13 @@ export type CampaignStatus = "Draft" | "Scheduled" | "Running" | "Paused" | "Com
 export type LeadStatus = "New" | "Contacted" | "Qualified" | "Proposal" | "Won" | "Lost";
 export type InboxStatus = "Connected" | "Error" | "Connecting";
 
+// ── Sequence A/B Variant ────────────────────────────────────────────────────
+export interface ABVariant {
+  subjectB: string;
+  bodyB: string;
+  splitPct: number; // 0-100, % sent to variant B
+}
+
 // ── Sequence ────────────────────────────────────────────────────────────────
 export type DelayUnit = "minutes" | "hours" | "days";
 
@@ -13,6 +20,7 @@ export interface Sequence {
   body: string;
   delayDays: number;
   delayUnit: DelayUnit;
+  abVariant?: ABVariant; // optional A/B test variant
 }
 
 // ── Campaign Analytics ────────────────────────────────────────────────────────
@@ -48,13 +56,16 @@ export interface RampSettings {
 export interface Campaign {
   id: string;
   name: string;
-  sendingEmail: string;
+  sendingEmail: string;       // primary inbox email (kept for backward compat)
+  inboxIds: string[];         // multi-inbox: array of InboxAccount IDs
   fromName: string;
   domain: string;
   status: CampaignStatus;
   sequences: Sequence[];
   leadIds: string[];
   emailsPerDay: number;
+  emailsPerDayPerInbox: number;  // per-inbox daily cap (10-100)
+  batchDelayMinutes: number;     // delay between batches (0-15 min)
   startDate: string;
   createdAt: string;
   analytics: CampaignAnalytics;
@@ -64,13 +75,22 @@ export interface Campaign {
 // ── Lead ────────────────────────────────────────────────────────────────────
 export interface Lead {
   id: string;
+
   firstName: string;
   lastName: string;
+
   email: string;
   company?: string;
-  website?: string;
-  status: LeadStatus;
-  createdAt: string;
+
+  website?:   string;
+  linkedin?:  string;
+  instagram?: string;
+  facebook?:  string;
+
+  status?:    string;
+  tags?:      string[];
+
+  createdAt?: string;
 }
 
 // ── InboxAccount ────────────────────────────────────────────────────────────

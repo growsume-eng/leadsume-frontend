@@ -20,20 +20,28 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 //   email       text  (nullable)
 //   company     text  (nullable)
 //   website     text  (nullable)
+//   linkedin    text  (nullable)
+//   instagram   text  (nullable)
+//   facebook    text  (nullable)
 //   status      text  (nullable)  New | Contacted | Qualified | Proposal | Won | Lost
+//   tags        text  (nullable)  comma-separated string
 //   created_at  timestamptz (default now())
 
 /**
  * Raw shape returned by Supabase — every non-PK column can be null.
  */
 export interface SupabaseLead {
-  id: string;
+  id:          string;
   first_name:  string | null;
   last_name:   string | null;
   email:       string | null;
   company:     string | null;
   website:     string | null;
+  linkedin:    string | null;
+  instagram:   string | null;
+  facebook:    string | null;
   status:      string | null;
+  tags:        string | null;
   created_at:  string | null;
 }
 
@@ -41,17 +49,26 @@ import type { Lead } from "@/lib/types";
 
 /**
  * Safely converts a raw Supabase row into the Lead shape used by the UI.
- * Every field is guarded against null / undefined.
+ * Every field is guarded against null / undefined — no runtime crashes.
  */
 export function dbLeadToLocal(row: SupabaseLead): Lead {
   return {
     id:        row.id,
+
     firstName: row.first_name  || "",
     lastName:  row.last_name   || "",
+
     email:     row.email       || "",
     company:   row.company     || "",
+
     website:   row.website     || "",
-    status:    (row.status     || "New") as Lead["status"],
+    linkedin:  row.linkedin    || "",
+    instagram: row.instagram   || "",
+    facebook:  row.facebook    || "",
+
+    status:    row.status      || "New",
+    tags:      (row.tags || "").split(",").map(t => t.trim()).filter(Boolean),
+
     createdAt: row.created_at  || new Date().toISOString(),
   };
 }
