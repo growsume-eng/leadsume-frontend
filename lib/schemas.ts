@@ -18,7 +18,7 @@ export const campaignDetailsSchema = z.object({
 
 export const campaignScheduleSchema = z.object({
   emailsPerDay: z.number().min(1).max(500),
-  startDate: z.string().min(1, "Start date is required"),
+  startDate:    z.string().optional().default(""),
 });
 
 // ── Lead schema ──────────────────────────────────────────────────────────────

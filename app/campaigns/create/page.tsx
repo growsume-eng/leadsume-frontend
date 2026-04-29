@@ -11,6 +11,7 @@ import { generateId, parseSpintax } from "@/lib/utils";
 import { toast } from "sonner";
 import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles, Inbox, Zap, AlertCircle } from "lucide-react";
 import SequenceEditor from "@/components/campaigns/SequenceEditor";
+import ScheduleTab, { type ScheduleConfig } from "@/components/campaigns/ScheduleTab";
 
 const STEPS = ["Details", "Sequences", "Recipients", "Schedule", "Review"];
 
@@ -39,9 +40,13 @@ export default function CampaignCreatePage() {
   const [csvText, setCsvText] = useState("");
   const [showCsvImport, setShowCsvImport] = useState(false);
 
-  // Step 4: schedule
+  // Step 4: schedule — managed as local state, not a form
   const [schedule, setSchedule] = useState<CampaignScheduleValues | null>(null);
-  const scheduleForm = useForm<CampaignScheduleValues>({ resolver: zodResolver(campaignScheduleSchema), defaultValues: { emailsPerDay: 50, startDate: "" } });
+  const [scheduleConfig, setScheduleConfig] = useState<ScheduleConfig>({
+    emailsPerDayPerInbox: emailsPerDayPerInbox,
+    batchDelayMinutes: 0,
+    startDate: "",
+  });
 
   // Inboxes grouped by domain
   const inboxesByDomain = useMemo(() => {
@@ -111,9 +116,8 @@ export default function CampaignCreatePage() {
     } else if (step === 2) {
       setStep(3);
     } else if (step === 3) {
-      const ok = await scheduleForm.trigger();
-      if (!ok) return;
-      setSchedule(scheduleForm.getValues());
+      // persist schedule values into both compat + new state
+      setSchedule({ emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50, startDate: scheduleConfig.startDate });
       setStep(4);
     }
   }
@@ -135,10 +139,10 @@ export default function CampaignCreatePage() {
       status: "Running",
       sequences,
       leadIds: selectedLeadIds,
-      emailsPerDay: totalDailyCapacity || schedule.emailsPerDay,
-      emailsPerDayPerInbox: emailsPerDayPerInbox,
-      batchDelayMinutes: 0,
-      startDate: schedule.startDate,
+      emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
+      emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
+      batchDelayMinutes: scheduleConfig.batchDelayMinutes,
+      startDate: scheduleConfig.startDate,
       analytics: emptyAnalytics,
       rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
     };
@@ -164,10 +168,10 @@ export default function CampaignCreatePage() {
       status: "Draft",
       sequences,
       leadIds: selectedLeadIds,
-      emailsPerDay: totalDailyCapacity || scheduleForm.getValues("emailsPerDay") || 50,
-      emailsPerDayPerInbox: emailsPerDayPerInbox,
-      batchDelayMinutes: 0,
-      startDate: scheduleForm.getValues("startDate") || "",
+      emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
+      emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
+      batchDelayMinutes: scheduleConfig.batchDelayMinutes,
+      startDate: scheduleConfig.startDate,
       analytics: emptyAnalytics,
       rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
     };
@@ -368,21 +372,11 @@ export default function CampaignCreatePage() {
 
         {/* Step 3: Schedule */}
         {step === 3 && (
-          <div className="space-y-5">
-            <h3 className="text-base font-semibold text-slate-200">Sending Schedule</h3>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Emails Per Day (limit)</label>
-              <input type="number" {...scheduleForm.register("emailsPerDay", { valueAsNumber: true })} min={1} max={500}
-                className="w-full px-3 py-2.5 bg-[#0b0f1a] border border-[#1f2d45] rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
-              {scheduleForm.formState.errors.emailsPerDay && <p className="text-xs text-rose-400 mt-1">{scheduleForm.formState.errors.emailsPerDay.message}</p>}
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Start Date</label>
-              <input type="date" {...scheduleForm.register("startDate")}
-                className="w-full px-3 py-2.5 bg-[#0b0f1a] border border-[#1f2d45] rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50" />
-              {scheduleForm.formState.errors.startDate && <p className="text-xs text-rose-400 mt-1">{scheduleForm.formState.errors.startDate.message}</p>}
-            </div>
-          </div>
+          <ScheduleTab
+            inboxCount={selectedInboxIds.length}
+            value={scheduleConfig}
+            onChange={setScheduleConfig}
+          />
         )}
 
         {/* Step 4: Review */}
@@ -395,11 +389,12 @@ export default function CampaignCreatePage() {
                 { label: "From Name",        value: details.fromName },
                 { label: "Domain",           value: details.domain },
                 { label: "Inboxes",          value: `${selectedInboxIds.length} selected` },
-                { label: "Daily Capacity",   value: `${totalDailyCapacity} emails/day` },
-                { label: "Per-Inbox Cap",    value: `${emailsPerDayPerInbox}/day` },
+                { label: "Daily Capacity",   value: `~${scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length} emails/day` },
+                { label: "Per-Inbox Cap",    value: `${scheduleConfig.emailsPerDayPerInbox}/day` },
+                { label: "Batch Delay",      value: scheduleConfig.batchDelayMinutes === 0 ? "None" : `${scheduleConfig.batchDelayMinutes} min` },
                 { label: "Recipients",       value: `${selectedLeadIds.length} leads` },
                 { label: "Sequences",        value: `${sequences.length} steps` },
-                { label: "Start Date",       value: schedule.startDate || "Immediately" },
+                { label: "Start Date",       value: scheduleConfig.startDate || "Immediately" },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-[#0d1424] border border-[#1f2d45] rounded-lg p-3">
                   <p className="text-xs text-slate-500 mb-0.5">{label}</p>
