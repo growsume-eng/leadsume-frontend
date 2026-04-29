@@ -28,8 +28,7 @@ export default function CampaignEditPage() {
 
   if (!campaign) return null;
 
-  function addSequence() { setSequences([...sequences, { id: generateId(), subject: "", body: "", delayDays: 3 }]); }
-  function removeSeq(id: string) { setSequences(sequences.filter(s => s.id !== id)); }
+  function addSequence() { setSequences([ ...sequences, { id: generateId(), subject: "", body: "", delayDays: 0, delayUnit: "days" } ]); }  function removeSeq(id: string) { setSequences(sequences.filter(s => s.id !== id)); }
   function updateSeq(id: string, field: keyof Sequence, value: string | number) {
     setSequences(sequences.map(s => s.id === id ? { ...s, [field]: value } : s));
   }

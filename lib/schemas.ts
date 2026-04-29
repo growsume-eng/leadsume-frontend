@@ -38,7 +38,7 @@ export const inboxSchema = z.object({
   smtpHost: z.string().min(1, "SMTP host is required"),
   smtpPort: z.number().min(1).max(65535),
   password: z.string().min(1, "Password is required"),
-  warmupEnabled: z.boolean(),
+  dailyCap: z.number().min(1, "Daily cap must be at least 1").max(10000),
 });
 
 // ── Profile schema ───────────────────────────────────────────────────────────

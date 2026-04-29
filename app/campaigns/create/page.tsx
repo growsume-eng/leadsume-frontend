@@ -24,7 +24,7 @@ export default function CampaignCreatePage() {
   const detailsForm = useForm<CampaignDetailsValues>({ resolver: zodResolver(campaignDetailsSchema), defaultValues: { name: "", sendingEmail: "", fromName: "", domain: "" } });
 
   // Step 2: sequences
-  const [sequences, setSequences] = useState<Sequence[]>([{ id: generateId(), subject: "", body: "", delayDays: 0 }]);
+  const [sequences, setSequences] = useState<Sequence[]>([{ id: generateId(), subject: "", body: "", delayDays: 0, delayUnit: "days" }]);
   const [previewText, setPreviewText] = useState<string | null>(null);
 
   // Step 3: recipients
@@ -37,7 +37,7 @@ export default function CampaignCreatePage() {
   const scheduleForm = useForm<CampaignScheduleValues>({ resolver: zodResolver(campaignScheduleSchema), defaultValues: { emailsPerDay: 50, startDate: "" } });
 
   function addSequence() {
-    setSequences([...sequences, { id: generateId(), subject: "", body: "", delayDays: sequences.length * 3 }]);
+    setSequences([...sequences, { id: generateId(), subject: "", body: "", delayDays: sequences.length * 3, delayUnit: "days" }]);
   }
   function removeSequence(id: string) { setSequences(sequences.filter(s => s.id !== id)); }
   function updateSeq(id: string, field: keyof Sequence, value: string | number) {
@@ -78,10 +78,24 @@ export default function CampaignCreatePage() {
 
   function handleLaunch() {
     if (!details || !schedule) return;
+    const emptyAnalytics = {
+      openRate: 0, replyRate: 0, bounceRate: 0,
+      interestedRate: 0, notInterestedRate: 0,
+      bookedRate: 0, notRepliedRate: 0,
+      sequenceStats: [], timeSeries: [],
+    };
     const campaign: Omit<Campaign, "id" | "createdAt"> = {
-      name: details.name, sendingEmail: details.sendingEmail, fromName: details.fromName,
-      domain: details.domain, status: "Running", sequences, leadIds: selectedLeadIds,
-      emailsPerDay: schedule.emailsPerDay, startDate: schedule.startDate,
+      name: details.name,
+      sendingEmail: details.sendingEmail,
+      fromName: details.fromName,
+      domain: details.domain,
+      status: "Running",
+      sequences,
+      leadIds: selectedLeadIds,
+      emailsPerDay: schedule.emailsPerDay,
+      startDate: schedule.startDate,
+      analytics: emptyAnalytics,
+      rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
     };
     dispatch({ type: "ADD_CAMPAIGN", payload: campaign });
     toast.success("Campaign launched! 🚀");
@@ -90,10 +104,24 @@ export default function CampaignCreatePage() {
 
   function handleSaveDraft() {
     if (!details) return;
+    const emptyAnalytics = {
+      openRate: 0, replyRate: 0, bounceRate: 0,
+      interestedRate: 0, notInterestedRate: 0,
+      bookedRate: 0, notRepliedRate: 0,
+      sequenceStats: [], timeSeries: [],
+    };
     const campaign: Omit<Campaign, "id" | "createdAt"> = {
-      name: details.name, sendingEmail: details.sendingEmail || "", fromName: details.fromName || "",
-      domain: details.domain || "", status: "Draft", sequences, leadIds: selectedLeadIds,
-      emailsPerDay: 50, startDate: "",
+      name: details.name,
+      sendingEmail: details.sendingEmail || "",
+      fromName: details.fromName || "",
+      domain: details.domain || "",
+      status: "Draft",
+      sequences,
+      leadIds: selectedLeadIds,
+      emailsPerDay: scheduleForm.getValues("emailsPerDay") || 50,
+      startDate: scheduleForm.getValues("startDate") || "",
+      analytics: emptyAnalytics,
+      rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
     };
     dispatch({ type: "ADD_CAMPAIGN", payload: campaign });
     toast.success("Saved as draft");
