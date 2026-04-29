@@ -1,6 +1,6 @@
 "use client";
 
-import CapacityCalculator from "@/components/campaigns/CapacityCalculator";
+import ColdEmailSimulator from "@/components/campaigns/ColdEmailSimulator";
 import { Calculator } from "lucide-react";
 
 export default function CalculatorPage() {
@@ -11,13 +11,13 @@ export default function CalculatorPage() {
           <Calculator className="w-5 h-5 text-indigo-400" />
         </div>
         <div>
-          <h2 className="text-xl font-bold text-slate-100">Capacity Calculator</h2>
+          <h2 className="text-xl font-bold text-slate-100">Cold Email Simulator</h2>
           <p className="text-sm text-slate-400 mt-0.5">
-            Simulate your cold email lead flow, ramp-up phase, and daily equilibrium
+            Day-by-day lead flow simulation — ramp phase, equilibrium, and monthly estimates
           </p>
         </div>
       </div>
-      <CapacityCalculator />
+      <ColdEmailSimulator />
     </div>
   );
 }
