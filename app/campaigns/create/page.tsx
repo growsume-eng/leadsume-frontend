@@ -1,15 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useAppState, useAppDispatch } from "@/context/AppContext";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { campaignDetailsSchema, campaignScheduleSchema, type CampaignDetailsValues, type CampaignScheduleValues } from "@/lib/schemas";
-import type { Sequence, Campaign } from "@/lib/types";
+import type { Sequence, Campaign, InboxAccount } from "@/lib/types";
 import { generateId, parseSpintax } from "@/lib/utils";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles, Inbox, Zap, AlertCircle } from "lucide-react";
 
 const STEPS = ["Details", "Sequences", "Recipients", "Schedule", "Review"];
 
@@ -27,6 +27,10 @@ export default function CampaignCreatePage() {
   const [sequences, setSequences] = useState<Sequence[]>([{ id: generateId(), subject: "", body: "", delayDays: 0, delayUnit: "days" }]);
   const [previewText, setPreviewText] = useState<string | null>(null);
 
+  // Step 0 extras: multi-inbox + per-inbox cap
+  const [selectedInboxIds, setSelectedInboxIds] = useState<string[]>([]);
+  const [emailsPerDayPerInbox, setEmailsPerDayPerInbox] = useState(30);
+
   // Step 3: recipients
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
   const [csvText, setCsvText] = useState("");
@@ -35,6 +39,19 @@ export default function CampaignCreatePage() {
   // Step 4: schedule
   const [schedule, setSchedule] = useState<CampaignScheduleValues | null>(null);
   const scheduleForm = useForm<CampaignScheduleValues>({ resolver: zodResolver(campaignScheduleSchema), defaultValues: { emailsPerDay: 50, startDate: "" } });
+
+  // Inboxes grouped by domain
+  const inboxesByDomain = useMemo(() => {
+    const map = new Map<string, InboxAccount[]>();
+    state.inboxes.forEach(inbox => {
+      const domain = inbox.email.split("@")[1] ?? "other";
+      if (!map.has(domain)) map.set(domain, []);
+      map.get(domain)!.push(inbox);
+    });
+    return map;
+  }, [state.inboxes]);
+
+  const totalDailyCapacity = selectedInboxIds.length * emailsPerDayPerInbox;
 
   function addSequence() {
     setSequences([...sequences, { id: generateId(), subject: "", body: "", delayDays: sequences.length * 3, delayUnit: "days" }]);
@@ -57,11 +74,24 @@ export default function CampaignCreatePage() {
     setShowCsvImport(false);
   }
 
+  function toggleInbox(id: string) {
+    setSelectedInboxIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  }
+
   async function handleNext() {
     if (step === 0) {
       const ok = await detailsForm.trigger();
       if (!ok) return;
-      setDetails(detailsForm.getValues());
+      if (selectedInboxIds.length === 0) {
+        toast.error("Select at least 1 inbox before continuing");
+        return;
+      }
+      // derive sendingEmail from first selected inbox
+      const primaryInbox = state.inboxes.find(i => i.id === selectedInboxIds[0]);
+      detailsForm.setValue("sendingEmail", primaryInbox?.email ?? "");
+      setDetails({ ...detailsForm.getValues(), sendingEmail: primaryInbox?.email ?? "" });
       setStep(1);
     } else if (step === 1) {
       if (sequences.some(s => !s.subject || !s.body)) { toast.error("Fill all sequence fields"); return; }
@@ -87,14 +117,14 @@ export default function CampaignCreatePage() {
     const campaign: Omit<Campaign, "id" | "createdAt"> = {
       name: details.name,
       sendingEmail: details.sendingEmail,
-      inboxIds: [details.sendingEmail],
+      inboxIds: selectedInboxIds,
       fromName: details.fromName,
       domain: details.domain,
       status: "Running",
       sequences,
       leadIds: selectedLeadIds,
-      emailsPerDay: schedule.emailsPerDay,
-      emailsPerDayPerInbox: schedule.emailsPerDay,
+      emailsPerDay: totalDailyCapacity || schedule.emailsPerDay,
+      emailsPerDayPerInbox: emailsPerDayPerInbox,
       batchDelayMinutes: 0,
       startDate: schedule.startDate,
       analytics: emptyAnalytics,
@@ -116,14 +146,14 @@ export default function CampaignCreatePage() {
     const campaign: Omit<Campaign, "id" | "createdAt"> = {
       name: details.name,
       sendingEmail: details.sendingEmail || "",
-      inboxIds: [details.sendingEmail || ""],
+      inboxIds: selectedInboxIds,
       fromName: details.fromName || "",
       domain: details.domain || "",
       status: "Draft",
       sequences,
       leadIds: selectedLeadIds,
-      emailsPerDay: scheduleForm.getValues("emailsPerDay") || 50,
-      emailsPerDayPerInbox: scheduleForm.getValues("emailsPerDay") || 50,
+      emailsPerDay: totalDailyCapacity || scheduleForm.getValues("emailsPerDay") || 50,
+      emailsPerDayPerInbox: emailsPerDayPerInbox,
       batchDelayMinutes: 0,
       startDate: scheduleForm.getValues("startDate") || "",
       analytics: emptyAnalytics,
@@ -171,15 +201,106 @@ export default function CampaignCreatePage() {
                 {detailsForm.formState.errors[name] && <p className="text-xs text-rose-400 mt-1">{detailsForm.formState.errors[name]?.message}</p>}
               </div>
             ))}
+            {/* ── Multi-inbox selector ───────────────────────────────── */}
             <div>
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Sending Inbox</label>
-              <select {...detailsForm.register("sendingEmail")}
-                className="w-full px-3 py-2.5 bg-[#0b0f1a] border border-[#1f2d45] rounded-lg text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/50">
-                <option value="">Select an inbox…</option>
-                {state.inboxes.map(i => <option key={i.id} value={i.email}>{i.email}</option>)}
-              </select>
-              {detailsForm.formState.errors.sendingEmail && <p className="text-xs text-rose-400 mt-1">{detailsForm.formState.errors.sendingEmail.message}</p>}
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-slate-400">Sending Inboxes</label>
+                <div className="flex items-center gap-3">
+                  {selectedInboxIds.length > 0 && (
+                    <span className="text-xs text-indigo-400 font-medium">
+                      {selectedInboxIds.length} inbox{selectedInboxIds.length !== 1 ? "es" : ""} selected
+                    </span>
+                  )}
+                  {totalDailyCapacity > 0 && (
+                    <span className="flex items-center gap-1 text-xs text-emerald-400 font-medium">
+                      <Zap className="w-3 h-3" />
+                      {totalDailyCapacity} emails/day
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {state.inboxes.length === 0 ? (
+                <div className="flex items-center gap-2 p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl text-xs text-amber-400">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  No inboxes found. <a href="/inboxes" className="underline ml-1">Add an inbox first →</a>
+                </div>
+              ) : (
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {Array.from(inboxesByDomain.entries()).map(([domain, inboxes]) => (
+                    <div key={domain} className="bg-[#0d1424] border border-[#1f2d45] rounded-xl overflow-hidden">
+                      {/* Domain header */}
+                      <div className="flex items-center gap-2 px-3 py-2 border-b border-[#1f2d45] bg-[#0b0f1a]">
+                        <Inbox className="w-3.5 h-3.5 text-slate-500" />
+                        <span className="text-xs font-semibold text-slate-400">{domain}</span>
+                        <span className="ml-auto text-[10px] text-slate-600">{inboxes.length} inbox{inboxes.length !== 1 ? "es" : ""}</span>
+                      </div>
+                      {/* Inbox rows */}
+                      {inboxes.map(inbox => {
+                        const checked = selectedInboxIds.includes(inbox.id);
+                        const statusColor = inbox.status === "Connected" ? "bg-emerald-400" : inbox.status === "Error" ? "bg-rose-400" : "bg-amber-400";
+                        return (
+                          <label
+                            key={inbox.id}
+                            className={`flex items-center gap-3 px-3 py-2.5 cursor-pointer transition-colors hover:bg-white/3 ${
+                              checked ? "bg-indigo-600/8" : ""
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleInbox(inbox.id)}
+                              className="w-4 h-4 rounded accent-indigo-500 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-sm font-medium truncate ${
+                                checked ? "text-slate-200" : "text-slate-400"
+                              }`}>{inbox.email}</p>
+                              <p className="text-[10px] text-slate-600">
+                                Cap: {inbox.dailyCap}/day
+                              </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <span className={`w-1.5 h-1.5 rounded-full ${statusColor}`} />
+                              <span className="text-[10px] text-slate-600">{inbox.status}</span>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {selectedInboxIds.length === 0 && state.inboxes.length > 0 && (
+                <p className="flex items-center gap-1.5 text-xs text-rose-400 mt-2">
+                  <AlertCircle className="w-3.5 h-3.5" /> Select at least 1 inbox
+                </p>
+              )}
             </div>
+
+            {/* ── Per-inbox daily cap slider ──────────────────────────── */}
+            {selectedInboxIds.length > 0 && (
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-xs font-medium text-slate-400">Emails per Inbox per Day</label>
+                  <span className="text-xs font-semibold text-indigo-400">{emailsPerDayPerInbox}</span>
+                </div>
+                <input
+                  type="range" min={10} max={100} step={5}
+                  value={emailsPerDayPerInbox}
+                  onChange={e => setEmailsPerDayPerInbox(Number(e.target.value))}
+                  className="w-full h-1.5 rounded-full appearance-none bg-[#1f2d45] accent-indigo-500 cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] text-slate-700 mt-0.5">
+                  <span>10</span><span>100</span>
+                </div>
+                <div className="mt-2 flex items-center justify-between bg-indigo-600/10 border border-indigo-600/20 rounded-lg px-3 py-2">
+                  <span className="text-xs text-slate-400">Total daily capacity</span>
+                  <span className="text-sm font-bold text-indigo-400">{totalDailyCapacity} emails/day</span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
@@ -292,14 +413,15 @@ export default function CampaignCreatePage() {
             <h3 className="text-base font-semibold text-slate-200">Review & Launch</h3>
             <div className="grid grid-cols-2 gap-4">
               {[
-                { label: "Campaign Name", value: details.name },
-                { label: "Sending From", value: details.sendingEmail },
-                { label: "From Name", value: details.fromName },
-                { label: "Domain", value: details.domain },
-                { label: "Recipients", value: `${selectedLeadIds.length} leads` },
-                { label: "Sequences", value: `${sequences.length} steps` },
-                { label: "Emails/Day", value: schedule.emailsPerDay },
-                { label: "Start Date", value: schedule.startDate || "Immediately" },
+                { label: "Campaign Name",   value: details.name },
+                { label: "From Name",        value: details.fromName },
+                { label: "Domain",           value: details.domain },
+                { label: "Inboxes",          value: `${selectedInboxIds.length} selected` },
+                { label: "Daily Capacity",   value: `${totalDailyCapacity} emails/day` },
+                { label: "Per-Inbox Cap",    value: `${emailsPerDayPerInbox}/day` },
+                { label: "Recipients",       value: `${selectedLeadIds.length} leads` },
+                { label: "Sequences",        value: `${sequences.length} steps` },
+                { label: "Start Date",       value: schedule.startDate || "Immediately" },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-[#0d1424] border border-[#1f2d45] rounded-lg p-3">
                   <p className="text-xs text-slate-500 mb-0.5">{label}</p>

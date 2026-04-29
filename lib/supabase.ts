@@ -72,3 +72,78 @@ export function dbLeadToLocal(row: SupabaseLead): Lead {
     createdAt: row.created_at  || new Date().toISOString(),
   };
 }
+
+// ─── Campaigns ──────────────────────────────────────────────────────────────────
+// Supabase "campaigns" table columns:
+//   id                   uuid (primary key)
+//   name                 text
+//   sending_email        text   (primary/compat inbox email)
+//   inbox_ids            text[] (array of InboxAccount IDs)
+//   from_name            text
+//   domain               text
+//   status               text
+//   emails_per_day       integer
+//   emails_per_day_per_inbox integer
+//   batch_delay_minutes  integer
+//   start_date           text
+//   created_at           timestamptz
+
+/**
+ * Raw shape of a campaign row from Supabase.
+ */
+export interface SupabaseCampaign {
+  id:                       string;
+  name:                     string | null;
+  sending_email:            string | null;
+  inbox_ids:                string[] | null;  // postgres array → JS array (or null if not set)
+  from_name:                string | null;
+  domain:                   string | null;
+  status:                   string | null;
+  emails_per_day:           number | null;
+  emails_per_day_per_inbox: number | null;
+  batch_delay_minutes:      number | null;
+  start_date:               string | null;
+  created_at:               string | null;
+}
+
+import type { Campaign } from "@/lib/types";
+
+/**
+ * Converts a raw Supabase campaign row to the Campaign shape used by the UI.
+ * inbox_ids is safely coerced to an array (handles null / undefined).
+ */
+export function dbCampaignToLocal(row: SupabaseCampaign): Omit<Campaign, "sequences" | "leadIds" | "analytics" | "rampSettings"> {
+  return {
+    id:                   row.id,
+    name:                 row.name                     || "",
+    sendingEmail:         row.sending_email            || "",
+    inboxIds:             Array.isArray(row.inbox_ids) ? row.inbox_ids : [],
+    fromName:             row.from_name                || "",
+    domain:               row.domain                   || "",
+    status:               (row.status as Campaign["status"]) || "Draft",
+    emailsPerDay:         row.emails_per_day           ?? 50,
+    emailsPerDayPerInbox: row.emails_per_day_per_inbox ?? 50,
+    batchDelayMinutes:    row.batch_delay_minutes      ?? 0,
+    startDate:            row.start_date               || "",
+    createdAt:            row.created_at               || new Date().toISOString(),
+  };
+}
+
+/**
+ * Builds the Supabase-safe insert/update payload for a campaign.
+ * inbox_ids stored as a postgres text array.
+ */
+export function campaignToDb(c: Omit<Campaign, "id" | "createdAt" | "sequences" | "leadIds" | "analytics" | "rampSettings">) {
+  return {
+    name:                     c.name,
+    sending_email:            c.sendingEmail,
+    inbox_ids:                c.inboxIds.length > 0 ? c.inboxIds : [],
+    from_name:                c.fromName,
+    domain:                   c.domain,
+    status:                   c.status,
+    emails_per_day:           c.emailsPerDay,
+    emails_per_day_per_inbox: c.emailsPerDayPerInbox,
+    batch_delay_minutes:      c.batchDelayMinutes,
+    start_date:               c.startDate || null,
+  };
+}

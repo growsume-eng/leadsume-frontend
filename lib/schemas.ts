@@ -10,10 +10,10 @@ export const sequenceSchema = z.object({
 
 // ── Campaign schemas ─────────────────────────────────────────────────────────
 export const campaignDetailsSchema = z.object({
-  name: z.string().min(1, "Campaign name is required"),
-  sendingEmail: z.string().min(1, "Select a sending inbox"),
-  fromName: z.string().min(1, "From name is required"),
-  domain: z.string().min(1, "Domain is required"),
+  name:         z.string().min(1, "Campaign name is required"),
+  sendingEmail: z.string(), // set via setValue from inbox selection; defaultValues=""
+  fromName:     z.string().min(1, "From name is required"),
+  domain:       z.string().min(1, "Domain is required"),
 });
 
 export const campaignScheduleSchema = z.object({
