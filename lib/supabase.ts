@@ -95,7 +95,7 @@ export interface SupabaseCampaign {
   id:                       string;
   name:                     string | null;
   sending_email:            string | null;
-  inbox_ids:                string[] | null;  // postgres array → JS array (or null if not set)
+  inbox_ids:                string[] | null;
   from_name:                string | null;
   domain:                   string | null;
   status:                   string | null;
@@ -103,6 +103,10 @@ export interface SupabaseCampaign {
   emails_per_day_per_inbox: number | null;
   batch_delay_minutes:      number | null;
   start_date:               string | null;
+  sequences:                unknown | null;  // JSONB []
+  lead_ids:                 unknown | null;  // JSONB []
+  analytics:                unknown | null;  // JSONB {}
+  ramp_settings:            unknown | null;  // JSONB {}
   created_at:               string | null;
 }
 
@@ -112,7 +116,25 @@ import type { Campaign } from "@/lib/types";
  * Converts a raw Supabase campaign row to the Campaign shape used by the UI.
  * inbox_ids is safely coerced to an array (handles null / undefined).
  */
-export function dbCampaignToLocal(row: SupabaseCampaign): Omit<Campaign, "sequences" | "leadIds" | "analytics" | "rampSettings"> {
+const EMPTY_ANALYTICS = {
+  openRate: 0, replyRate: 0, bounceRate: 0,
+  interestedRate: 0, notInterestedRate: 0,
+  bookedRate: 0, notRepliedRate: 0,
+  sequenceStats: [], timeSeries: [],
+};
+
+/** Safely parse a JSONB value — returns fallback on any error. */
+function safeJson<T>(val: unknown, fallback: T): T {
+  if (val === null || val === undefined) return fallback;
+  if (typeof val === "object") return val as T;   // Supabase already parsed it
+  try { return JSON.parse(val as string) as T; } catch { return fallback; }
+}
+
+/**
+ * Converts a raw Supabase campaign row to the Campaign shape used by the UI.
+ * All JSONB fields (sequences, lead_ids, analytics) parsed safely.
+ */
+export function dbCampaignToLocal(row: SupabaseCampaign): Campaign {
   return {
     id:                   row.id,
     name:                 row.name                     || "",
@@ -125,15 +147,19 @@ export function dbCampaignToLocal(row: SupabaseCampaign): Omit<Campaign, "sequen
     emailsPerDayPerInbox: row.emails_per_day_per_inbox ?? 50,
     batchDelayMinutes:    row.batch_delay_minutes      ?? 0,
     startDate:            row.start_date               || "",
+    sequences:            safeJson<Campaign["sequences"]>(row.sequences, []),
+    leadIds:              safeJson<string[]>(row.lead_ids, []),
+    analytics:            safeJson<Campaign["analytics"]>(row.analytics, EMPTY_ANALYTICS),
+    rampSettings:         safeJson<Campaign["rampSettings"]>(row.ramp_settings, { enabled: false, start: 5, step: 5, max: 50 }),
     createdAt:            row.created_at               || new Date().toISOString(),
   };
 }
 
 /**
  * Builds the Supabase-safe insert/update payload for a campaign.
- * inbox_ids stored as a postgres text array.
+ * sequences and analytics stored as JSONB.
  */
-export function campaignToDb(c: Omit<Campaign, "id" | "createdAt" | "sequences" | "leadIds" | "analytics" | "rampSettings">) {
+export function campaignToDb(c: Omit<Campaign, "id" | "createdAt">) {
   return {
     name:                     c.name,
     sending_email:            c.sendingEmail,
@@ -145,6 +171,10 @@ export function campaignToDb(c: Omit<Campaign, "id" | "createdAt" | "sequences" 
     emails_per_day_per_inbox: c.emailsPerDayPerInbox,
     batch_delay_minutes:      c.batchDelayMinutes,
     start_date:               c.startDate || null,
+    sequences:                c.sequences  ?? [],
+    lead_ids:                 c.leadIds    ?? [],
+    analytics:                c.analytics  ?? EMPTY_ANALYTICS,
+    ramp_settings:            c.rampSettings ?? { enabled: false, start: 5, step: 5, max: 50 },
   };
 }
 

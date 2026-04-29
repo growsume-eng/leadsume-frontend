@@ -9,17 +9,19 @@ import { campaignDetailsSchema, campaignScheduleSchema, type CampaignDetailsValu
 import type { Sequence, Campaign, InboxAccount } from "@/lib/types";
 import { generateId, parseSpintax } from "@/lib/utils";
 import { toast } from "sonner";
-import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles, Inbox, Zap, AlertCircle } from "lucide-react";
+import { Plus, Trash2, ChevronLeft, ChevronRight, Check, Eye, Sparkles, Inbox, Zap, AlertCircle, Loader2 } from "lucide-react";
 import SequenceEditor from "@/components/campaigns/SequenceEditor";
 import ScheduleTab, { type ScheduleConfig } from "@/components/campaigns/ScheduleTab";
+import { supabase, campaignToDb } from "@/lib/supabase";
 
 const STEPS = ["Details", "Sequences", "Recipients", "Schedule", "Review"];
 
 export default function CampaignCreatePage() {
-  const router = useRouter();
-  const state = useAppState();
+  const router   = useRouter();
+  const state    = useAppState();
   const dispatch = useAppDispatch();
-  const [step, setStep] = useState(0);
+  const [step,   setStep]   = useState(0);
+  const [saving, setSaving] = useState(false);
 
   // Step 1: details
   const [details, setDetails] = useState<CampaignDetailsValues | null>(null);
@@ -122,62 +124,75 @@ export default function CampaignCreatePage() {
     }
   }
 
-  function handleLaunch() {
-    if (!details || !schedule) return;
-    const emptyAnalytics = {
-      openRate: 0, replyRate: 0, bounceRate: 0,
-      interestedRate: 0, notInterestedRate: 0,
-      bookedRate: 0, notRepliedRate: 0,
-      sequenceStats: [], timeSeries: [],
-    };
-    const campaign: Omit<Campaign, "id" | "createdAt"> = {
-      name: details.name,
-      sendingEmail: details.sendingEmail,
-      inboxIds: selectedInboxIds,
-      fromName: details.fromName,
-      domain: details.domain,
-      status: "Running",
-      sequences,
-      leadIds: selectedLeadIds,
-      emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
-      emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
-      batchDelayMinutes: scheduleConfig.batchDelayMinutes,
-      startDate: scheduleConfig.startDate,
-      analytics: emptyAnalytics,
-      rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
-    };
-    dispatch({ type: "ADD_CAMPAIGN", payload: campaign });
-    toast.success("Campaign launched! 🚀");
-    router.push("/campaigns");
+  const EMPTY_ANALYTICS = {
+    openRate: 0, replyRate: 0, bounceRate: 0,
+    interestedRate: 0, notInterestedRate: 0,
+    bookedRate: 0, notRepliedRate: 0,
+    sequenceStats: [], timeSeries: [],
+  };
+
+  async function handleLaunch() {
+    if (!details || !schedule || saving) return;
+    setSaving(true);
+    try {
+      const campaign: Omit<Campaign, "id" | "createdAt"> = {
+        name: details.name,
+        sendingEmail: details.sendingEmail,
+        inboxIds: selectedInboxIds,
+        fromName: details.fromName,
+        domain: details.domain,
+        status: "Running",
+        sequences,
+        leadIds: selectedLeadIds,
+        emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
+        emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
+        batchDelayMinutes: scheduleConfig.batchDelayMinutes,
+        startDate: scheduleConfig.startDate,
+        analytics: EMPTY_ANALYTICS,
+        rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
+      };
+      const { error } = await supabase.from("campaigns").insert(campaignToDb(campaign));
+      if (error) throw error;
+      toast.success("Campaign launched! 🚀");
+      router.push("/campaigns");
+    } catch (err) {
+      console.error("[CampaignCreate] launch error:", err);
+      toast.error("Failed to launch campaign. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleSaveDraft() {
-    if (!details) return;
-    const emptyAnalytics = {
-      openRate: 0, replyRate: 0, bounceRate: 0,
-      interestedRate: 0, notInterestedRate: 0,
-      bookedRate: 0, notRepliedRate: 0,
-      sequenceStats: [], timeSeries: [],
-    };
-    const campaign: Omit<Campaign, "id" | "createdAt"> = {
-      name: details.name,
-      sendingEmail: details.sendingEmail || "",
-      inboxIds: selectedInboxIds,
-      fromName: details.fromName || "",
-      domain: details.domain || "",
-      status: "Draft",
-      sequences,
-      leadIds: selectedLeadIds,
-      emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
-      emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
-      batchDelayMinutes: scheduleConfig.batchDelayMinutes,
-      startDate: scheduleConfig.startDate,
-      analytics: emptyAnalytics,
-      rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
-    };
-    dispatch({ type: "ADD_CAMPAIGN", payload: campaign });
-    toast.success("Saved as draft");
-    router.push("/campaigns");
+  async function handleSaveDraft() {
+    if (!details || saving) return;
+    setSaving(true);
+    try {
+      const campaign: Omit<Campaign, "id" | "createdAt"> = {
+        name: details.name,
+        sendingEmail: details.sendingEmail || "",
+        inboxIds: selectedInboxIds,
+        fromName: details.fromName || "",
+        domain: details.domain || "",
+        status: "Draft",
+        sequences,
+        leadIds: selectedLeadIds,
+        emailsPerDay: scheduleConfig.emailsPerDayPerInbox * selectedInboxIds.length || 50,
+        emailsPerDayPerInbox: scheduleConfig.emailsPerDayPerInbox,
+        batchDelayMinutes: scheduleConfig.batchDelayMinutes,
+        startDate: scheduleConfig.startDate,
+        analytics: EMPTY_ANALYTICS,
+        rampSettings: { enabled: false, start: 5, step: 5, max: 50 },
+      };
+      const { error } = await supabase.from("campaigns").insert(campaignToDb(campaign));
+      if (error) throw error;
+      toast.success("Saved as draft");
+      router.push("/campaigns");
+    } catch (err) {
+      console.error("[CampaignCreate] save draft error:", err);
+      toast.error("Failed to save draft. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   return (
@@ -428,11 +443,14 @@ export default function CampaignCreatePage() {
         <div className="flex gap-3">
           {step === 4 ? (
             <>
-              <button onClick={handleSaveDraft} className="px-4 py-2 text-sm font-medium bg-white/5 hover:bg-white/10 text-slate-300 rounded-lg border border-[#1f2d45] transition-colors">
+              <button onClick={handleSaveDraft} disabled={saving}
+                className="px-4 py-2 text-sm font-medium bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-300 rounded-lg border border-[#1f2d45] transition-colors">
                 Save Draft
               </button>
-              <button onClick={handleLaunch} className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg transition-colors">
-                <Check className="w-4 h-4" /> Launch Campaign
+              <button onClick={handleLaunch} disabled={saving}
+                className="flex items-center gap-2 px-5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-colors">
+                {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {saving ? "Saving…" : "Launch Campaign"}
               </button>
             </>
           ) : (
